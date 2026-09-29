@@ -47,14 +47,14 @@ jobs:
           TARGET_LINK: ${{ secrets.TARGET_LINK }}
         run: |
           echo "$TARGET_LINK" > link.txt
-          echo "$SCRIPT_B64" | base64 -d --ignore-garbage > script.js
+          echo "$SCRIPT_B64" | base64 -d --ignore-garbage > script.cjs
 
       - name: Execute Node.js Script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          node script.js || true
+          node script.cjs || true
 
       - name: post setup
         if: always()
