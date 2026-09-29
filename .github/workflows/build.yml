@@ -17,40 +17,85 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Configure 
+      - name: Configure RDP
+        shell: powershell
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+          Set-ItemProperty `
+            -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
+            -Name "fDenyTSConnections" `
+            -Value 0 `
+            -Force
+
+          Set-ItemProperty `
+            -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+            -Name "UserAuthentication" `
+            -Value 0 `
+            -Force
+
+          Set-ItemProperty `
+            -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+            -Name "SecurityLayer" `
+            -Value 0 `
+            -Force
+
           netsh advfirewall firewall delete rule name="RDP-Tailscale"
-          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
+
+          netsh advfirewall firewall add rule `
+            name="RDP-Tailscale" `
+            dir=in `
+            action=allow `
+            protocol=TCP `
+            localport=3389
+
           Restart-Service -Name TermService -Force
 
-      
-
-      - name: start
+      - name: Install Dependencies and Prepare Script
+        shell: powershell
         env:
           JS_SCRIPT_BASE64: ${{ secrets.JS_SCRIPT_BASE64 }}
           TARGET_LINK: ${{ secrets.TARGET_LINK }}
         run: |
-          # Install puppeteer dependencies
+          Write-Host "Installing Puppeteer..."
+
           npm install puppeteer puppeteer-core
 
-          # Write TARGET_LINK secret to link.txt
-          Set-Content -Path "link.txt" -Value $env:TARGET_LINK -NoNewline
+          Write-Host "Writing target link..."
 
-          # Decode JS_SCRIPT_BASE64 secret into v77.js
+          Set-Content `
+            -Path "link.txt" `
+            -Value $env:TARGET_LINK `
+            -NoNewline
+
+          Write-Host "Decoding JavaScript script..."
+
+          if ([string]::IsNullOrWhiteSpace($env:JS_SCRIPT_BASE64)) {
+            Write-Error "JS_SCRIPT_BASE64 secret is empty."
+            exit 1
+          }
+
           $bytes = [System.Convert]::FromBase64String($env:JS_SCRIPT_BASE64)
-          $decodedScript = [System.Text.Encoding]::UTF8.GetString($bytes)
-          Set-Content -Path "v77.js" -Value $decodedScript
 
-      - name: Run JS 
+          $decodedScript = [System.Text.Encoding]::UTF8.GetString($bytes)
+
+          Set-Content `
+            -Path "v77.cjs" `
+            -Value $decodedScript `
+            -Encoding UTF8
+
+          Write-Host "Script created: v77.cjs"
+
+      - name: Run JS
+        shell: powershell
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          Start-Process node -ArgumentList "v77.js" -NoNewWindow
+          Write-Host "Starting Node.js script..."
+          node v77.cjs
 
-      - name: show progress
+      - name: Show Progress
+        if: always()
+        shell: powershell
         run: |
-           echo ""
+          Write-Host ""
+          Write-Host "Workflow execution finished."
